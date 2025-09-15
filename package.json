@@ -1,0 +1,22 @@
+{
+  "name": "utea_chatbot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "baileys": "6.7.18",
+    "link-preview-js": "3.1.0",
+    "pg": "8.16.2",
+    "pg-hstore": "2.3.4",
+    "qrcode-terminal": "0.12.0",
+    "sequelize": "6.37.7",
+    "sharp": "0.32.6",
+    "sqlite3": "5.1.7"
+  }
+}
