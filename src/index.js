@@ -1,6 +1,7 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("baileys");
 const qrcode = require("qrcode-terminal");
 const { buscar_acceso_agrocittca } = require("./data_accesos_agrocittca_control");
+const { obtenerToken } = require('./get_token_imgs_sat');
 
 let sock = null; // 🔁 variable global
 
@@ -90,10 +91,13 @@ async function connectToWhatsApp() {
                         }
                     }
                     if (opcionSeleccionada.proceso){
-                        res = await opcionSeleccionada.proceso(userContext[id].cod_ca)
-                        await sock.sendMessage(id, { text: res });
-                        await sock.sendMessage(id, { text: "Hasta pronto...!" });
+                        await opcionSeleccionada.proceso(sock, userContext, id)
                         delete userContext[id];
+                        
+                        //res = await opcionSeleccionada.proceso(userContext[id].cod_ca)
+                        //await sock.sendMessage(id, { text: res });
+                        //await sock.sendMessage(id, { text: "Hasta pronto...!" });
+                        //delete userContext[id];
                     }
                     if (opcionSeleccionada.submenu) {
                         userContext[id].menuActual = opcionSeleccionada.submenu;
@@ -125,22 +129,62 @@ async function validar_usuario(cod_ca){
     }
 }
 
-async function get_acceso_agrocittca(cod_ca){
+async function get_acceso_agrocittca(sock_aux, user_aux, idd){
+    cod_ca = user_aux[idd].cod_ca
     const acceso = await buscar_acceso_agrocittca(cod_ca)
-    console.log("=======================")
-    console.log(acceso)
     if (Object.keys(acceso).length === 0) {
-        return `No se encontraron accesos AgroCITTCA para el codigo ${cod_ca}`;
+        const msj = `No se encontraron accesos AgroCITTCA para el codigo ${cod_ca}`;
+        await sock_aux.sendMessage(idd, { text : msj })
     }
-    return `Acceso para codigo Cañero ${cod_ca}: 
-    Usuario: ${acceso.usuario}
-    Contraseña: ${acceso.password}`
+    const msj = `*Tus credenciales para AgroCITTCA son:* 
+    👤 *Usuario:* ${acceso.usuario}
+    🔑 *Contraseña:* ${acceso.password}.
+
+Descarga la App:
+- Androind: https://play.google.com/store/apps/details?id=com.dima.guabira
+
+- IPhone: https://apps.apple.com/us/app/agro-cittca-guabir%C3%A1/id1669149924`
+    await sock_aux.sendMessage(idd, { text : msj })
+}
+
+async function get_acceso_nax(sock_aux, user_aux, idd){
+    cod_ca = user_aux[idd].cod_ca
+    const acceso = await buscar_acceso_agrocittca(cod_ca)
+    const email = acceso.email
+    const pass_temp = "A123456*"
+    const token = await obtenerToken(email, pass_temp)
+    if (typeof token === "string" && token.trim() !== "") {
+        const link = "https://beta.naxsolutions.com/home/smart-models/reports?token=" + token;
+        await sock_aux.sendMessage(idd, {
+            text: "Ingresa aquí para ver tus propiedades 👆",
+            contextInfo: {
+                externalAdReply: {
+                    title: "Monitoreo Satelital",
+                    body: "Accede a tus propiedades",
+                    mediaType: 1,
+                    //thumbnailUrl: "https://tse1.mm.bing.net/th/id/OIP.5niMVpQQVNH2KZFRaDjRTAAAAA?rs=1&pid=ImgDetMain&o=7&rm=3", // opcional
+                    //sourceUrl: link
+                    thumbnailUrl: link,
+                }
+            }
+        });
+        
+    } else {
+        const msj = `Su codigo cañero no tiene acceso Monitoreo Satelital`;
+        await sock_aux.sendMessage(idd, { text : msj })
+    }
+
+    
+    console.log(email)
+    console.log(pass_temp)
+    console.log(token)
+
 }
 
 async function enviarMenu(sock, id, menuKey) {
     const menu = menuData[menuKey]
     const optionText = Object.entries(menu.options)
-        .map(([key, option]) => `- 👉 *${key}*: ${option.text}`)
+        .map(([key, option]) => `${key}. ${option.text}`)
         .join("\n");
     const menuMensaje = `${menu.mensaje}\n${optionText}\n\n> *Indicanos una opcion*`;
     sock.sendMessage(id, { text: menuMensaje });
@@ -150,18 +194,13 @@ let menuData = {
     main: {
         mensaje: "*Bienvenido, Como puedo ayudarte?*",
         options: {
-            A: {
-                text: "Usuario y contraseña para AGROCITTCA",
+            1: {
+                text: "Acceso a *AgroCITTCA* 📲",
                 proceso: get_acceso_agrocittca
             },
-            B: {
-                text: "Planos de propiedades",
-                respuesta: {
-                    tipo: "text",
-                    msg: {
-                        url: "Planos..."
-                    }
-                }
+            2: {
+                text: "Monitoreo satelital inteligente 🛰️",
+                proceso: get_acceso_nax
             }
         }
     }
